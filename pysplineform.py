@@ -47,6 +47,56 @@ class ManagedCurve(object):
 
         self.curve.figure.canvas.draw()
 
+    def nearest_existing_points_idx(self, xy):
+        """
+        Given x, y find the two neares consecutive points.
+        x,y is then sorted in between.
+
+        return: the index of the optimal successor
+        """
+        nodes = np.array([p.getxy() for p in self.pointlist])
+        sdiff = np.sum((nodes - np.array(xy))**2, axis=1)
+
+
+        idxmin1 = np.argmin(sdiff)
+
+        if idxmin1 == 0:
+            idxmin2 = 1
+        elif idxmin1 == self.N - 1:
+            idxmin2 = self.N - 2
+        else:
+            if sdiff[idxmin1-1] < sdiff[idxmin1+1]:
+                idxmin2 = idxmin1 - 1
+            else:
+                idxmin2 = idxmin1 + 1
+
+        return max(idxmin1, idxmin2)
+
+    def onclick(self, event):
+        if event.dblclick and event.button == 1:
+
+            # add new point:
+            xy = event.xdata, event.ydata
+
+            idx = self.nearest_existing_points_idx(xy)
+            pnt = DraggablePoint(event.xdata, event.ydata)
+            # remove it from the end of the list:
+            self.pointlist.pop()
+            # and insert it at the desired position (before idx)
+            self.pointlist.insert(idx, pnt)
+
+            self.N += 1
+            self.draw_curve()
+
+    def onkey(self, event):
+
+        if not event.key in ['x', 'y', 'a']: return
+
+        if event.key == 'a':
+            self.draw_curve()
+            return
+
+
 
 class DraggablePoint(object):
     manager = None
@@ -137,27 +187,22 @@ class DraggablePoint(object):
 
 
 
-def onkey(event):
-
-    #onkey2(event)
-    if not event.key in ['x', 'y', 'a']: return
-
-    if event.key == 'a':
-        mc.draw_curve()
-        return
-
-
 if __name__ == '__main__':
 
 
-    fig = plt.figure()
-    cid = fig.canvas.mpl_connect('key_press_event', onkey)
+    np.random.seed(1)
 
+    fig = plt.figure()
     mc = ManagedCurve(N=4)
+    cid = fig.canvas.mpl_connect('key_press_event', mc.onkey)
+    connection_id = fig.canvas.mpl_connect('button_press_event', mc.onclick)
+
     DraggablePoint.manager = mc
 
     for x, y in np.random.rand(mc.N, 2):
         DraggablePoint(x, y)
+
+    mc.draw_curve()
 
     plt.show()
 
