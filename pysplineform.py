@@ -25,19 +25,51 @@ mpl.cbook._BoundMethodProxy._destroy = lambda x, y: None
 
 class ManagedCurve(object):
 
-    def __init__(self, N):
+    def __init__(self, N=0):
         self.N = N
         self.pointlist = []
         self.curve = None
 
-    def draw_curve(self):
+    def load_data(self, fname):
 
+        assert fname.endswith(".npy")
+        nodes = np.load(fname)
+        n, m = nodes.shape
+        assert n >= 4 and m == 2
+        self.N = n
+
+        for xy in nodes:
+            DraggablePoint(*xy)
+
+
+    def save_data(self, fname):
+        assert fname.endswith(".npy")
+        nodes = np.array([p.getxy() for p in self.pointlist])
+
+        np.save(fname, nodes)
+        print("File written: {}".format(fname))
+
+    def _get_spline_interpolation(self):
+        """
+        calculate an interpolation spline through the points
+
+        returns:
+            tck: tuple containing all necessary information about the spline
+            u: values ffor the path-parameter
+        """
         nodes = np.array([p.getxy() for p in self.pointlist])
 
         xx, yy = nodes.T
 
         # strongly inspired by https://stackoverflow.com/a/29841948/333403
-        tck, u = interpolate.splprep( [xx, yy] ,s = 0 )
+        tck, u = interpolate.splprep( [xx, yy] , s=0 )
+
+        return tck, u
+
+    def draw_curve(self):
+
+        tck, u = self._get_spline_interpolation()
+
         xnew, ynew = interpolate.splev( np.linspace( 0, 1, 100), tck, der=0)
 
         if self.curve is None:
@@ -63,17 +95,21 @@ class ManagedCurve(object):
         if not successor:
             return idxmin1
 
-        if idxmin1 == 0:
-            idxmin2 = 1
-        elif idxmin1 == self.N - 1:
-            idxmin2 = self.N - 2
-        else:
-            if sdiff[idxmin1-1] < sdiff[idxmin1+1]:
-                idxmin2 = idxmin1 - 1
-            else:
-                idxmin2 = idxmin1 + 1
+        # dertemine the tangen direction of the curve in that point
+        tck, u = self._get_spline_interpolation()
 
-        return max(idxmin1, idxmin2)
+        # evaluate first derivative at nearest point
+        pth_par = u[idxmin1]
+        tangent_vector = interpolate.splev( pth_par, tck, der=1)
+        diff_vector = nodes[idxmin1, :] - np.array(xy)
+
+        # calc dot product (projecting curve tangent to diff_vector)
+        # if positive: choose next point as successor, else choose this one
+        dp = np.dot(tangent_vector, diff_vector)
+        if dp < 0:
+            return idxmin1 + 1
+        else:
+            return idxmin1
 
     def _new_point(self, event):
         # add new point:
@@ -108,12 +144,8 @@ class ManagedCurve(object):
     def onclick(self, event):
         if event.dblclick and event.button == 1:
             return self._new_point(event)
-        elif event.button != 1:
+        elif event.button == 2:
             self._remove_point(event)
-
-
-
-
 
     def onkey(self, event):
 
@@ -124,7 +156,6 @@ class ManagedCurve(object):
             return
 
 
-
 class DraggablePoint(object):
     manager = None
 
@@ -132,7 +163,6 @@ class DraggablePoint(object):
 
         if color == None:
             fraction = len(self.manager.pointlist)/self.manager.N
-            print(fraction)
             color = stdcolormap(fraction)
 
 
@@ -175,7 +205,6 @@ class DraggablePoint(object):
         contains, attrd = self.rect.contains(event)
         if not contains: return
         x0, y0 = self.rect._x[0], self.rect._y[0]
-        #print 'event contains', x0, y0
         self.press = x0, y0, event.xdata, event.ydata
 
     def getxy(self):
@@ -214,28 +243,22 @@ class DraggablePoint(object):
         self.rect.figure.canvas.mpl_disconnect(self.cidmotion)
 
 
-
 if __name__ == '__main__':
 
 
     np.random.seed(1)
 
     fig = plt.figure()
-    mc = ManagedCurve(N=4)
+    mc = ManagedCurve()
     cid = fig.canvas.mpl_connect('key_press_event', mc.onkey)
     connection_id = fig.canvas.mpl_connect('button_press_event', mc.onclick)
 
     DraggablePoint.manager = mc
-
-    for x, y in np.random.rand(mc.N, 2):
-        DraggablePoint(x, y)
+    mc.load_data("parking-data.npy")
 
     mc.draw_curve()
 
     plt.show()
 
-
-
-
-
+    mc.save_data("parking-data.npy")
 
