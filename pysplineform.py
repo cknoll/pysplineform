@@ -47,18 +47,21 @@ class ManagedCurve(object):
 
         self.curve.figure.canvas.draw()
 
-    def nearest_existing_points_idx(self, xy):
+    def nearest_existing_points_idx(self, xy, successor=False):
         """
         Given x, y find the two neares consecutive points.
         x,y is then sorted in between.
 
-        return: the index of the optimal successor
+        return: the index of the nearest point or optimal successor
         """
         nodes = np.array([p.getxy() for p in self.pointlist])
         sdiff = np.sum((nodes - np.array(xy))**2, axis=1)
 
 
         idxmin1 = np.argmin(sdiff)
+
+        if not successor:
+            return idxmin1
 
         if idxmin1 == 0:
             idxmin2 = 1
@@ -72,21 +75,45 @@ class ManagedCurve(object):
 
         return max(idxmin1, idxmin2)
 
+    def _new_point(self, event):
+        # add new point:
+        xy = event.xdata, event.ydata
+
+        idx = self.nearest_existing_points_idx(xy, successor=True)
+        pnt = DraggablePoint(event.xdata, event.ydata)
+        # remove it from the end of the list:
+        self.pointlist.pop()
+        # and insert it at the desired position (before idx)
+        self.pointlist.insert(idx, pnt)
+
+        self.N += 1
+        self.draw_curve()
+
+    def _remove_point(self, event):
+        if self.N <= 4:
+            print("Need at least 4 points for spline.")
+            return
+
+        xy = event.xdata, event.ydata
+        idx = self.nearest_existing_points_idx(xy)
+        pnt = self.pointlist.pop(idx)
+        pnt.rect.remove()
+        self.curve.remove()
+#        IPS()
+        self.N -= 1
+        self.curve = None
+        self.draw_curve()
+
+
     def onclick(self, event):
         if event.dblclick and event.button == 1:
+            return self._new_point(event)
+        elif event.button != 1:
+            self._remove_point(event)
 
-            # add new point:
-            xy = event.xdata, event.ydata
 
-            idx = self.nearest_existing_points_idx(xy)
-            pnt = DraggablePoint(event.xdata, event.ydata)
-            # remove it from the end of the list:
-            self.pointlist.pop()
-            # and insert it at the desired position (before idx)
-            self.pointlist.insert(idx, pnt)
 
-            self.N += 1
-            self.draw_curve()
+
 
     def onkey(self, event):
 
@@ -175,6 +202,7 @@ class DraggablePoint(object):
         self.press = None
         #self.rect.figure.canvas.draw()
         self.draw_new()
+        self.manager.draw_curve()
 
     def disconnect(self):
         'disconnect all the stored connection ids'
