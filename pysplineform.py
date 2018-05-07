@@ -32,7 +32,12 @@ class ManagedCurve(object):
     def load_data(self, fname):
 
         assert fname.endswith(".npy")
-        nodes = np.load(fname)
+        try:
+            nodes = np.load(fname)
+        except FileNotFoundError:
+            # if there is no data present, use the following
+            # hardcoded data
+            nodes = np.array([[1, 2, 3, 4], [0, 3, 4, 0]]).T
         n, m = nodes.shape
         assert n >= 4 and m == 2
         self.N = n
