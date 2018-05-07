@@ -18,7 +18,6 @@ import matplotlib.cm
 stdcolormap = matplotlib.cm.viridis
 
 
-
 # this serves to prevent some strange error messages after closing the figure
 mpl.cbook._BoundMethodProxy._destroy = lambda x, y: None
 
@@ -41,7 +40,6 @@ class ManagedCurve(object):
         for xy in nodes:
             DraggablePoint(*xy)
 
-
     def save_data(self, fname):
         assert fname.endswith(".npy")
         nodes = np.array([p.getxy() for p in self.pointlist])
@@ -62,7 +60,7 @@ class ManagedCurve(object):
         xx, yy = nodes.T
 
         # strongly inspired by https://stackoverflow.com/a/29841948/333403
-        tck, u = interpolate.splprep( [xx, yy] , s=0 )
+        tck, u = interpolate.splprep([xx, yy], s=0)
 
         return tck, u
 
@@ -70,7 +68,7 @@ class ManagedCurve(object):
 
         tck, u = self._get_spline_interpolation()
 
-        xnew, ynew = interpolate.splev( np.linspace( 0, 1, 100), tck, der=0)
+        xnew, ynew = interpolate.splev( np.linspace(0, 1, 100), tck, der=0 )
 
         if self.curve is None:
             self.curve, = plt.plot(xnew, ynew, '-g')
@@ -89,7 +87,6 @@ class ManagedCurve(object):
         nodes = np.array([p.getxy() for p in self.pointlist])
         sdiff = np.sum((nodes - np.array(xy))**2, axis=1)
 
-
         idxmin1 = np.argmin(sdiff)
 
         if not successor:
@@ -100,7 +97,7 @@ class ManagedCurve(object):
 
         # evaluate first derivative at nearest point
         pth_par = u[idxmin1]
-        tangent_vector = interpolate.splev( pth_par, tck, der=1)
+        tangent_vector = interpolate.splev( pth_par, tck, der=1 )
         diff_vector = nodes[idxmin1, :] - np.array(xy)
 
         # calc dot product (projecting curve tangent to diff_vector)
@@ -135,11 +132,9 @@ class ManagedCurve(object):
         pnt = self.pointlist.pop(idx)
         pnt.rect.remove()
         self.curve.remove()
-#        IPS()
         self.N -= 1
         self.curve = None
         self.draw_curve()
-
 
     def onclick(self, event):
         if event.dblclick and event.button == 1:
@@ -149,7 +144,8 @@ class ManagedCurve(object):
 
     def onkey(self, event):
 
-        if not event.key in ['x', 'y', 'a']: return
+        if event.key not in ['x', 'y', 'a']:
+            return
 
         if event.key == 'a':
             self.draw_curve()
@@ -161,10 +157,9 @@ class DraggablePoint(object):
 
     def __init__(self, x, y, color=None):
 
-        if color == None:
+        if color is None:
             fraction = len(self.manager.pointlist)/self.manager.N
             color = stdcolormap(fraction)
-
 
         rect, = plt.plot([x], [y], 'o', c=color)
 
@@ -186,8 +181,10 @@ class DraggablePoint(object):
         self.connect()
 
     def connect(self):
-        if self.connected == True: return
-        else : self.connected = True
+        if self.connected:
+            return
+        else:
+            self.connected = True
 
         'connect to all the events we need'
         self.cidpress = self.rect.figure.canvas.mpl_connect(
@@ -197,13 +194,17 @@ class DraggablePoint(object):
         self.cidmotion = self.rect.figure.canvas.mpl_connect(
             'motion_notify_event', self.on_motion)
 
-
     def on_press(self, event):
-        'on button press we will see if the mouse is over us and store some data'
-        if event.inaxes != self.rect.axes: return
+        """
+        on button press we will see if the mouse is over us and store some
+        data
+        """
+        if event.inaxes != self.rect.axes:
+            return
 
         contains, attrd = self.rect.contains(event)
-        if not contains: return
+        if not contains:
+            return
         x0, y0 = self.rect._x[0], self.rect._y[0]
         self.press = x0, y0, event.xdata, event.ydata
 
@@ -212,8 +213,10 @@ class DraggablePoint(object):
 
     def on_motion(self, event):
         'on motion we will move the rect if the mouse is over us'
-        if self.press is None: return
-        if event.inaxes != self.rect.axes: return
+        if self.press is None:
+            return
+        if event.inaxes != self.rect.axes:
+            return
         x0, y0, xpress, ypress = self.press
         dx = event.xdata - xpress
         dy = event.ydata - ypress
@@ -229,14 +232,15 @@ class DraggablePoint(object):
     def on_release(self, event):
         'on release we reset the press data'
         self.press = None
-        #self.rect.figure.canvas.draw()
         self.draw_new()
         self.manager.draw_curve()
 
     def disconnect(self):
         'disconnect all the stored connection ids'
-        if self.connected == False: return
-        else : self.connected = False
+        if not self.connected:
+            return
+        else:
+            self.connected = False
 
         self.rect.figure.canvas.mpl_disconnect(self.cidpress)
         self.rect.figure.canvas.mpl_disconnect(self.cidrelease)
@@ -245,6 +249,7 @@ class DraggablePoint(object):
 
 if __name__ == '__main__':
 
+    fname = "nodes.npy"
 
     np.random.seed(1)
 
@@ -254,11 +259,11 @@ if __name__ == '__main__':
     connection_id = fig.canvas.mpl_connect('button_press_event', mc.onclick)
 
     DraggablePoint.manager = mc
-    mc.load_data("parking-data.npy")
+    mc.load_data(fname)
 
     mc.draw_curve()
 
     plt.show()
 
-    mc.save_data("parking-data.npy")
-
+    if input("Save file {} (y/n)".format(fname)) in ['y', 'Y']:
+        mc.save_data(fname)
